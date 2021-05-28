@@ -51,6 +51,7 @@ func (r *Req) Header(key string,value string) *Req {
 	}
 	return r
 }
+
 // Url 设置请求地址 格式为 http://开头
 func  (r *Req) Url(httpPath string) *Req {
 	_url, err := url.Parse(httpPath)
