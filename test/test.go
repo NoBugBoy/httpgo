@@ -1,35 +1,86 @@
-package main
+package test
 
 import (
 	"fmt"
-	. "http-go/http"
+	. "github.com/NoBugBoy/httpgo/http"
+	"io/ioutil"
 	"net/http"
 	"sync"
 )
-// 压力测试
-var join sync.WaitGroup
-func main() {
-	arr := make([]*Req,1000)
 
-	for i := 0 ; i < 1000 ; i++ {
+// Test4 测试response close
+func Test4() {
+	req := &Req{}
+	_, _ = req.ImportProxy().
+		Method(http.MethodGet).
+		Url("http://www.baidu.com?a=1").
+		Params(Query{
+			"x": "123",
+		}).
+		Timeout(30).
+		Go(). //只有调用Go才会发起请求，并且在该方法内进行连接关闭防止泄露
+		Body()
+	close, _ := ioutil.ReadAll(req.Response.Body)
+	if len(close) == 0 {
+		fmt.Println("连接已经关闭")
+	} else {
+		fmt.Println("连接未关闭")
+	}
+
+}
+
+// Test3 测试Params和pathQuery同时存在应该优先使用pathQuery
+func Test3() {
+	req := &Req{}
+	result, _ := req.ImportProxy().
+		Method(http.MethodGet).
+		Url("http://www.baidu.com?a=1").
+		Params(Query{
+			"x": "123",
+		}).
+		Timeout(30).Go().Body()
+	fmt.Println(result)
+}
+
+// Test2 代理测试 关注返回关键字 "您的IP"
+func Test2() {
+	req := &Req{}
+	result, _ := req.ImportProxy().
+		Method(http.MethodGet).
+		Header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36").
+		Url("http://ip.tool.chinaz.com/").
+		Proxy().
+		Timeout(30).Go().Body()
+	fmt.Println(result)
+}
+
+var join sync.WaitGroup
+
+// Test1 压力测试, 注意 ulimit 和 maxfd 的调优 /**
+func Test1() {
+	arr := make([]*Req, 0)
+
+	for i := 0; i < 2000; i++ {
 		join.Add(1)
 		req := &Req{}
-		x := req.Url("http://www.youtube.com").
+		x := req.Url("http://localhost:8080/get/1").
 			Method(http.MethodGet).
-			Header("Content-Type","application/json").
+			Header("Content-Type", "application/json").
 			Params(Query{
-				"id":"1",
+				"id": "1",
 			}).
-			Timeout(1).
+			Timeout(100).
 			Build()
-		arr[i] = x
+		arr = append(arr, x)
 	}
 	for _, req := range arr {
 		go runAndPrint(req)
 	}
 	join.Wait()
 }
-func runAndPrint(r *Req)  {
+
+// 并发请求
+func runAndPrint(r *Req) {
 	defer join.Done()
 	fmt.Println(r.Go().Body())
 }
