@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 )
-
 // Test4 测试response close
 func Test4() {
 	req := &Req{}
