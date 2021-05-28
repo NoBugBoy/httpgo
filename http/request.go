@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	json "github.com/json-iterator/go"
 	"io/ioutil"
@@ -230,11 +231,11 @@ func (r *Req) Go() *Req {
 }
 
 // Body 直接获取返回值
-func (r *Req) Body() string {
-	if r.Response == nil{
-		fmt.Println("request error response is nil ..")
-		return ""
+func (r *Req) Body() (string,error) {
+	if r.Response == nil || r.result == ""{
+		return "",errors.New("empty response")
 	}
-	return r.result
+	return r.result,nil
 }
+
 
