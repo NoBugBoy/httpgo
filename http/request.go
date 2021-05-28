@@ -85,7 +85,7 @@ func (r *Req) Params(m Query) *Req {
 }
 
 // ParseParams deep parse get params
-func ParseParams(v interface{}) string{
+func parseParams(v interface{}) string{
 	if k, ok := v.(string); ok {
 		return k
 	}else if k, ok := v.(int); ok{
@@ -96,14 +96,14 @@ func ParseParams(v interface{}) string{
 		return fmt.Sprintf("%.2f", k)
 	}else if k, ok := v.([]interface{}); ok{
 		for i := range k {
-			ParseParams(i)
+			parseParams(i)
 		}
 	}else{
 		re := reflect.TypeOf(v)
 		for i := 0; i < re.NumField(); i++ {
 			f := re.Field(i)
 			value := reflect.ValueOf(f)
-			ParseParams(value)
+			parseParams(value)
 		}
 	}
 	return ""
@@ -114,7 +114,7 @@ func  buildGetParam(params map[string]interface{}) string {
 	for k, v := range params {
 		buff.WriteString(k)
 		buff.WriteString("=")
-		buff.WriteString(ParseParams(v))
+		buff.WriteString(parseParams(v))
 		buff.WriteString("&")
 	}
 	return string(buff.Next(buff.Len()-1))
