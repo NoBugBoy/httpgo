@@ -3,9 +3,12 @@ package test
 import (
 	"fmt"
 	. "github.com/NoBugBoy/httpgo/http"
+	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // Test4 测试response close
@@ -27,6 +30,48 @@ func Test4() {
 		fmt.Println("连接未关闭")
 	}
 
+}
+func startChunkServer() {
+	http.HandleFunc("/get",
+		func(writer http.ResponseWriter, request *http.Request) {
+			flusher, ok := writer.(http.Flusher)
+			if !ok {
+				panic("type err")
+			}
+			for i := 0; i < 10; i++ {
+				fmt.Fprintf(writer, "data [%d] %d \n", i, rand.Intn(999)+rand.Int())
+				flusher.Flush()
+				time.Sleep(time.Second * 2)
+			}
+		})
+	http.ListenAndServe(":8080", nil)
+}
+
+// Test5 测试分块传输
+func Test5() {
+	go startChunkServer()
+	req := &Req{}
+	re := req.ImportProxy().
+		Method(http.MethodGet).
+		Header("Connection", "Keep-Alive").
+		Header("Transfer-Encoding", "chunked").
+		Url("http://localhost:8080/get").
+		Chunk().
+		Timeout(30). //超时会关闭
+		Go()
+	fmt.Println(re.Response.Header)
+	data := make([]byte, 1024)
+	for {
+		read, err := re.Response.Body.Read(data)
+		fmt.Println("字节长度 ", read)
+		if read > 0 {
+			fmt.Print(string(data[:read]))
+		}
+		if err == io.EOF {
+			break
+		}
+	}
+	fmt.Println("Ok")
 }
 
 // Test3 测试Params和pathQuery同时存在应该优先使用pathQuery
@@ -50,7 +95,9 @@ func Test2() {
 		Header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36").
 		Url("http://ip.tool.chinaz.com/").
 		Proxy().
-		Timeout(30).Go().Body()
+		Timeout(30).
+		Go().
+		Body()
 	fmt.Println(result)
 }
 

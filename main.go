@@ -8,6 +8,6 @@ import (
 
 func main() {
 	start := time.Now()
-	test.Test4()
+	test.Test5()
 	fmt.Println(time.Now().Second() - start.Second())
 }

@@ -15,51 +15,59 @@ import (
 )
 
 var methods = map[string]string{
-	"GET": http.MethodGet,
-	"POST": http.MethodPost,
+	"GET":     http.MethodGet,
+	"POST":    http.MethodPost,
 	"OPTIONS": http.MethodOptions,
-	"DELETE": http.MethodDelete,
-	"PUT": http.MethodPut,
+	"DELETE":  http.MethodDelete,
+	"PUT":     http.MethodPut,
 }
 
 type Query map[string]interface{}
 
 // Req core object
 type Req struct {
-	client *http.Client // http client
-	method string //请求方式
-	url *url.URL // 请求路径
-	proxy *url.URL // 本次使用的代理
-	proxyArray []string // 代理列表
-	pathQuery bool //是否是路径请求参数
-	timeout time.Duration //超时时间（s）
-	retry int //重试次数
-	header http.Header //http header
-	Request *http.Request // 请求对象
-	Response *http.Response // 响应对象
-	result string //最后的返回值，为了正常关闭io
-	params map[string]interface{} //请求参数一律 key : value
+	client     *http.Client           // http client
+	method     string                 //请求方式
+	url        *url.URL               // 请求路径
+	proxy      *url.URL               // 本次使用的代理
+	proxyArray []string               // 代理列表
+	pathQuery  bool                   //是否是路径请求参数
+	timeout    time.Duration          //超时时间（s）
+	retry      int                    //重试次数
+	chunk      bool                   // chunk模式，自己控制读取Response.body,这里不会自动关闭
+	header     http.Header            //http header
+	Request    *http.Request          // 请求对象
+	Response   *http.Response         // 响应对象
+	result     string                 //最后的返回值，为了正常关闭io
+	params     map[string]interface{} //请求参数一律 key : value
 }
+
 // Header 设置请求头，多个调用多次即可
-func (r *Req) Header(key string,value string) *Req {
+func (r *Req) Header(key string, value string) *Req {
 	if r.header == nil {
 		header := http.Header{}
-		header.Set(key,value)
+		header.Set(key, value)
 		r.header = header
-	}else{
-		r.header.Set(key,value)
+	} else {
+		r.header.Set(key, value)
 	}
 	return r
 }
 
+// Chunk 开启chunk模式，自己控制读取Response.body,注意要手动关闭io
+func (r *Req) Chunk() *Req {
+	r.chunk = true
+	return r
+}
+
 // Url 设置请求地址 格式为 http://开头
-func  (r *Req) Url(httpPath string) *Req {
+func (r *Req) Url(httpPath string) *Req {
 	_url, err := url.Parse(httpPath)
-	if err != nil{
-		fmt.Println("http url parse error , check url format ",err)
+	if err != nil {
+		fmt.Println("http url parse error , check url format ", err)
 		return r
 	}
-	if str := strings.Contains(_url.String(), "?"); str{
+	if str := strings.Contains(_url.String(), "?"); str {
 		//路径携带？意味着是pathQuery
 		r.pathQuery = true
 	}
@@ -72,33 +80,34 @@ func (r *Req) Method(method string) *Req {
 
 	m := methods[strings.ToUpper(method)]
 	if m == "" {
-		fmt.Println("can not find method ",method)
+		fmt.Println("can not find method ", method)
 		return r
 	}
 	r.method = m
 	return r
 }
 
+// Params 设置请求参数 get post 等均可
 func (r *Req) Params(m Query) *Req {
 	r.params = m
 	return r
 }
 
 // ParseParams deep parse get params
-func parseParams(v interface{}) string{
+func parseParams(v interface{}) string {
 	if k, ok := v.(string); ok {
 		return k
-	}else if k, ok := v.(int); ok{
+	} else if k, ok := v.(int); ok {
 		return strconv.Itoa(k)
-	}else if k, ok := v.(float32); ok{
+	} else if k, ok := v.(float32); ok {
 		return fmt.Sprintf("%.2f", k)
-	}else if k, ok := v.(float64); ok{
+	} else if k, ok := v.(float64); ok {
 		return fmt.Sprintf("%.2f", k)
-	}else if k, ok := v.([]interface{}); ok{
+	} else if k, ok := v.([]interface{}); ok {
 		for i := range k {
 			parseParams(i)
 		}
-	}else{
+	} else {
 		re := reflect.TypeOf(v)
 		for i := 0; i < re.NumField(); i++ {
 			f := re.Field(i)
@@ -108,7 +117,7 @@ func parseParams(v interface{}) string{
 	}
 	return ""
 }
-func  buildGetParam(params map[string]interface{}) string {
+func buildGetParam(params map[string]interface{}) string {
 	buff := bytes.Buffer{}
 	buff.WriteString("?")
 	for k, v := range params {
@@ -117,15 +126,15 @@ func  buildGetParam(params map[string]interface{}) string {
 		buff.WriteString(parseParams(v))
 		buff.WriteString("&")
 	}
-	return string(buff.Next(buff.Len()-1))
+	return string(buff.Next(buff.Len() - 1))
 }
-func buildJson(params map[string]interface{}) []byte{
+func buildJson(params map[string]interface{}) []byte {
 	var b, _ = json.Marshal(params)
 	return b
 }
 
 // Timeout 设置请求超时时间
-func (r *Req) Timeout(second int) *Req{
+func (r *Req) Timeout(second int) *Req {
 	if second < 0 {
 		fmt.Println("timeout must gt 0 ")
 		second = 3
@@ -136,8 +145,9 @@ func (r *Req) Timeout(second int) *Req{
 	r.timeout = time.Duration(second) * time.Second
 	return r
 }
+
 // Retry 设置重试次数最大3次
-func (r *Req) Retry(count int) *Req{
+func (r *Req) Retry(count int) *Req {
 	if count < 0 {
 		count = 0
 	}
@@ -149,31 +159,31 @@ func (r *Req) Retry(count int) *Req{
 }
 
 // Build 预构建（方便统一调用Go）
-func (r *Req) Build() *Req{
+func (r *Req) Build() *Req {
 	var realpath string
 	var data []byte = nil
 	if r.method == http.MethodGet && r.pathQuery {
 		realpath = r.url.String()
-	}else if r.method == http.MethodGet && r.params != nil{
+	} else if r.method == http.MethodGet && r.params != nil {
 		realpath = r.url.String() + buildGetParam(r.params)
-	}else{
+	} else {
 		realpath = r.url.String()
-		data =  buildJson(r.params)
-   }
-	req , err := http.NewRequest(r.method,realpath,bytes.NewReader(data))
+		data = buildJson(r.params)
+	}
+	req, err := http.NewRequest(r.method, realpath, bytes.NewReader(data))
 	if err != nil {
-		fmt.Println("http new err = ",err)
+		fmt.Println("http new err = ", err)
 		return r
 	}
 	// add header
 	req.Header = r.header
 	// add request time out
-	if r.timeout.Seconds() <= 0{
+	if r.timeout.Seconds() <= 0 {
 		//默认是3s
 		r.timeout = time.Duration(3) * time.Second
 	}
 	// check new httpclient
-	if r.client == nil{
+	if r.client == nil {
 		r.client = &http.Client{}
 	}
 
@@ -185,46 +195,48 @@ func (r *Req) Build() *Req{
 // Go 实际调用发送请求
 func (r *Req) Go() *Req {
 	// 未预构建，自动构建请求
-	if r.Request == nil{
+	if r.Request == nil {
 		r.Build()
 	}
 	//关闭连接
 	defer func(*http.Request) {
-		if r.Request != nil && r.Request.Body != nil {
+		if r.Request != nil && r.Request.Body != nil && !r.chunk {
 			err := r.Request.Body.Close()
 			if err != nil {
-				fmt.Println("close request err",err)
+				fmt.Println("close request err", err)
 			}
 		}
 	}(r.Request)
 	// 关闭之后无法再次读取,[]byte len = 0
 	defer func(*http.Response) {
-		if r.Response != nil && r.Response.Body != nil{
+		if r.Response != nil && r.Response.Body != nil && !r.chunk {
 			err := r.Response.Body.Close()
 			if err != nil {
-				fmt.Println("关闭response连接 err",err)
+				fmt.Println("关闭response连接 err", err)
 			}
 		}
 	}(r.Response)
 	count := 1
 	// do while ?
-	for{
-		res,err := r.client.Do(r.Request)
-		if err != nil && r.retry == 0{
-			fmt.Println("http call err = ",err)
+	for {
+		res, err := r.client.Do(r.Request)
+		if err != nil && r.retry == 0 {
+			fmt.Println("http call err = ", err)
 			return r
-		}else if err != nil && r.retry > 0 {
-			fmt.Println("http call err retrying ...",count , "\n err = " , err)
-			r.retry --
-			count ++
+		} else if err != nil && r.retry > 0 {
+			fmt.Println("http call err retrying ...", count, "\n err = ", err)
+			r.retry--
+			count++
 			if r.retry == 0 {
 				return r
 			}
-		}else{
+		} else {
 			// ok
 			r.Response = res
-			b, _ := ioutil.ReadAll(r.Response.Body)
-			r.result = string(b)
+			if !r.chunk {
+				b, _ := ioutil.ReadAll(r.Response.Body)
+				r.result = string(b)
+			}
 			break
 		}
 	}
@@ -232,11 +244,9 @@ func (r *Req) Go() *Req {
 }
 
 // Body 直接获取返回值
-func (r *Req) Body() (string,error) {
-	if r.Response == nil || r.result == ""{
-		return "",errors.New("empty response")
+func (r *Req) Body() (string, error) {
+	if r.Response == nil || r.result == "" {
+		return "", errors.New("empty response")
 	}
-	return r.result,nil
+	return r.result, nil
 }
-
-
