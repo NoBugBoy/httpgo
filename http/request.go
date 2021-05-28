@@ -25,20 +25,19 @@ type Query map[string]interface{}
 
 // Req core object
 type Req struct {
-	client *http.Client
-	req *http.Request
-	method string
-	url *url.URL
-	param string
-	proxy *url.URL
-	proxyArray []string
-	pathQuery bool
-	timeout time.Duration
-	retry int
-	header http.Header
-	Request *http.Request
-	Response *http.Response
-	params map[string]interface{}
+	client *http.Client // http client
+	method string //请求方式
+	url *url.URL // 请求路径
+	proxy *url.URL // 本次使用的代理
+	proxyArray []string // 代理列表
+	pathQuery bool //是否是路径请求参数
+	timeout time.Duration //超时时间（s）
+	retry int //重试次数
+	header http.Header //http header
+	Request *http.Request // 请求对象
+	Response *http.Response // 响应对象
+	result string //最后的返回值，为了正常关闭io
+	params map[string]interface{} //请求参数一律 key : value
 }
 // Header 设置请求头，多个调用多次即可
 func (r *Req) Header(key string,value string) *Req {
@@ -178,20 +177,37 @@ func (r *Req) Build() *Req{
 	}
 
 	r.client.Timeout = r.timeout
-	r.req = req
+	r.Request = req
 	return r
 }
-
 // Go 实际调用发送请求
 func (r *Req) Go() *Req {
 	// 未预构建，自动构建请求
-	if r.req == nil{
+	if r.Request == nil{
 		r.Build()
 	}
+	//关闭连接
+	defer func(*http.Request) {
+		if r.Request != nil && r.Request.Body != nil {
+			err := r.Request.Body.Close()
+			if err != nil {
+				fmt.Println("close request err",err)
+			}
+		}
+	}(r.Request)
+	// 关闭之后无法再次读取,[]byte len = 0
+	defer func(*http.Response) {
+		if r.Response != nil && r.Response.Body != nil{
+			err := r.Response.Body.Close()
+			if err != nil {
+				fmt.Println("关闭response连接 err",err)
+			}
+		}
+	}(r.Response)
 	count := 1
 	// do while ?
 	for{
-		res,err := r.client.Do(r.req)
+		res,err := r.client.Do(r.Request)
 		if err != nil && r.retry == 0{
 			fmt.Println("http call err = ",err)
 			return r
@@ -205,20 +221,20 @@ func (r *Req) Go() *Req {
 		}else{
 			// ok
 			r.Response = res
+			b, _ := ioutil.ReadAll(r.Response.Body)
+			r.result = string(b)
 			break
 		}
 	}
-
 	return r
 }
 
-// Body 直接获取返回值，也可以获取response.Body字节数组自己解析
+// Body 直接获取返回值
 func (r *Req) Body() string {
 	if r.Response == nil{
 		fmt.Println("request error response is nil ..")
 		return ""
 	}
-	b, _ := ioutil.ReadAll(r.Response.Body)
-	return string(b)
+	return r.result
 }
 
