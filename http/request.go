@@ -32,6 +32,7 @@ type Req struct {
 	param string
 	proxy *url.URL
 	proxyArray []string
+	pathQuery bool
 	timeout time.Duration
 	retry int
 	header http.Header
@@ -56,6 +57,10 @@ func  (r *Req) Url(httpPath string) *Req {
 	if err != nil{
 		fmt.Println("http url parse error , check url format ",err)
 		return r
+	}
+	if str := strings.Contains(_url.String(), "?"); str{
+		//路径携带？意味着是pathQuery
+		r.pathQuery = true
 	}
 	r.url = _url
 	return r
@@ -146,9 +151,9 @@ func (r *Req) Retry(count int) *Req{
 func (r *Req) Build() *Req{
 	var realpath string
 	var data []byte = nil
-	if r.method == http.MethodGet && r.params==nil {
+	if r.method == http.MethodGet && r.pathQuery {
 		realpath = r.url.String()
-	}else if r.method == http.MethodGet && r.params!=nil{
+	}else if r.method == http.MethodGet && r.params != nil{
 		realpath = r.url.String() + buildGetParam(r.params)
 	}else{
 		realpath = r.url.String()
