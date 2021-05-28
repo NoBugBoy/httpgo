@@ -181,6 +181,7 @@ func (r *Req) Build() *Req{
 	r.Request = req
 	return r
 }
+
 // Go 实际调用发送请求
 func (r *Req) Go() *Req {
 	// 未预构建，自动构建请求
