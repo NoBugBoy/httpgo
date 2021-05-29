@@ -7,9 +7,32 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 )
+
+// Test7 测试QuickSend0
+func Test7()  {
+	get := QuickSend0()
+	_, _ = get("http://localhost:8080/get/1")
+	any := QuickSend()
+	_, _ = any("http://localhost:8080/get/1",http.MethodGet,nil)
+}
+
+// Test6 测试时间和内存
+func Test6()  {
+	start := time.Now()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Printf("%+v\n", m.TotalAlloc)
+	Test1()
+	runtime.ReadMemStats(&m)
+	fmt.Printf("%+v\n", m.TotalAlloc)
+	end := time.Since(start)
+	fmt.Println("time", end)
+}
+
 // Test4 测试response close
 func Test4() {
 	req := &Req{}
@@ -91,6 +114,7 @@ func Test2() {
 	req := &Req{}
 	result, _ := req.ImportProxy().
 		Method(http.MethodGet).
+		Header("Connection", "Keep-Alive").
 		Header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36").
 		Url("http://ip.tool.chinaz.com/").
 		Proxy().
@@ -105,17 +129,14 @@ var join sync.WaitGroup
 // Test1 压力测试, 注意 ulimit 和 maxfd 的调优 /**
 func Test1() {
 	arr := make([]*Req, 0)
-
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < 1000; i++ {
 		join.Add(1)
 		req := &Req{}
 		x := req.Url("http://localhost:8080/get/1").
 			Method(http.MethodGet).
+			Header("Connection", "Keep-Alive").
 			Header("Content-Type", "application/json").
-			Params(Query{
-				"id": "1",
-			}).
-			Timeout(100).
+			Timeout(30).
 			Build()
 		arr = append(arr, x)
 	}
@@ -128,5 +149,6 @@ func Test1() {
 // 并发请求
 func runAndPrint(r *Req) {
 	defer join.Done()
-	fmt.Println(r.Go().Body())
+	r.Go()
+	//fmt.Println(.Body())
 }

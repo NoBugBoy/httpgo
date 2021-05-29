@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	json "github.com/json-iterator/go"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,6 +14,12 @@ import (
 	"strings"
 	"time"
 )
+//单例http.Client,性能和多例对比差别不大，单内存占有会降低少许
+var httpClient *http.Client
+
+func init()  {
+	httpClient = &http.Client{}
+}
 
 var methods = map[string]string{
 	"GET":     http.MethodGet,
@@ -27,6 +34,7 @@ type Query map[string]interface{}
 // Req core object
 type Req struct {
 	client     *http.Client           // http client
+	transport  *http.Transport        //调优使用
 	method     string                 //请求方式
 	url        *url.URL               // 请求路径
 	proxy      *url.URL               // 本次使用的代理
@@ -43,54 +51,61 @@ type Req struct {
 }
 
 // Header 设置请求头，多个调用多次即可
-func (r *Req) Header(key string, value string) *Req {
-	if r.header == nil {
+func (req *Req) Header(key string, value string) *Req {
+	if req.header == nil {
 		header := http.Header{}
 		header.Set(key, value)
-		r.header = header
+		req.header = header
 	} else {
-		r.header.Set(key, value)
+		req.header.Set(key, value)
 	}
-	return r
+	return req
 }
 
 // Chunk 开启chunk模式，自己控制读取Response.body,注意要手动关闭io
-func (r *Req) Chunk() *Req {
-	r.chunk = true
-	return r
+func (req *Req) Chunk() *Req {
+	req.chunk = true
+	return req
+}
+
+// TransportSetting 对连接调优
+func (req *Req) TransportSetting() *http.Transport {
+	if req.transport == nil{
+		req.transport = &http.Transport{}
+	}
+	return req.transport
 }
 
 // Url 设置请求地址 格式为 http://开头
-func (r *Req) Url(httpPath string) *Req {
+func (req *Req) Url(httpPath string) *Req {
 	_url, err := url.Parse(httpPath)
 	if err != nil {
 		fmt.Println("http url parse error , check url format ", err)
-		return r
+		return req
 	}
 	if str := strings.Contains(_url.String(), "?"); str {
 		//路径携带？意味着是pathQuery
-		r.pathQuery = true
+		req.pathQuery = true
 	}
-	r.url = _url
-	return r
+	req.url = _url
+	return req
 }
 
 // Method 设置请求方式建议使用 http.MethodGet 方式
-func (r *Req) Method(method string) *Req {
-
+func (req *Req) Method(method string) *Req {
 	m := methods[strings.ToUpper(method)]
 	if m == "" {
 		fmt.Println("can not find method ", method)
-		return r
+		return req
 	}
-	r.method = m
-	return r
+	req.method = m
+	return req
 }
 
 // Params 设置请求参数 get post 等均可
-func (r *Req) Params(m Query) *Req {
-	r.params = m
-	return r
+func (req *Req) Params(m Query) *Req {
+	req.params = m
+	return req
 }
 
 // ParseParams deep parse get params
@@ -134,7 +149,7 @@ func buildJson(params map[string]interface{}) []byte {
 }
 
 // Timeout 设置请求超时时间
-func (r *Req) Timeout(second int) *Req {
+func (req *Req) Timeout(second int) *Req {
 	if second < 0 {
 		fmt.Println("timeout must gt 0 ")
 		second = 3
@@ -142,111 +157,111 @@ func (r *Req) Timeout(second int) *Req {
 	if second > 60 {
 		second = 60
 	}
-	r.timeout = time.Duration(second) * time.Second
-	return r
+	req.timeout = time.Duration(second) * time.Second
+	return req
 }
 
 // Retry 设置重试次数最大3次
-func (r *Req) Retry(count int) *Req {
+func (req *Req) Retry(count int) *Req {
 	if count < 0 {
 		count = 0
 	}
 	if count > 3 {
 		count = 3
 	}
-	r.retry = count
-	return r
+	req.retry = count
+	return req
 }
 
 // Build 预构建（方便统一调用Go）
-func (r *Req) Build() *Req {
+func (req *Req) Build() *Req {
 	var realpath string
 	var data []byte = nil
-	if r.method == http.MethodGet && r.pathQuery {
-		realpath = r.url.String()
-	} else if r.method == http.MethodGet && r.params != nil {
-		realpath = r.url.String() + buildGetParam(r.params)
+	if req.method == http.MethodGet && req.pathQuery {
+		realpath = req.url.String()
+	} else if req.method == http.MethodGet && req.params != nil {
+		realpath = req.url.String() + buildGetParam(req.params)
 	} else {
-		realpath = r.url.String()
-		data = buildJson(r.params)
+		realpath = req.url.String()
+		data = buildJson(req.params)
 	}
-	req, err := http.NewRequest(r.method, realpath, bytes.NewReader(data))
+	httpRequest, err := http.NewRequest(req.method, realpath, bytes.NewReader(data))
 	if err != nil {
 		fmt.Println("http new err = ", err)
-		return r
+		return req
 	}
 	// add header
-	req.Header = r.header
+	httpRequest.Header = req.header
 	// add request time out
-	if r.timeout.Seconds() <= 0 {
-		//默认是3s
-		r.timeout = time.Duration(3) * time.Second
+	if req.timeout.Seconds() <= 0 {
+		//默认是5s
+		req.timeout = time.Duration(5) * time.Second
 	}
-	// check new httpclient
-	if r.client == nil {
-		r.client = &http.Client{}
+	req.client = httpClient
+	if req.transport != nil {
+		req.client.Transport = req.transport
 	}
-
-	r.client.Timeout = r.timeout
-	r.Request = req
-	return r
+	req.client.Timeout = req.timeout
+	req.Request = httpRequest
+	return req
 }
 
 // Go 实际调用发送请求
-func (r *Req) Go() *Req {
+func (req *Req) Go() *Req {
 	// 未预构建，自动构建请求
-	if r.Request == nil {
-		r.Build()
+	if req.Request == nil {
+		req.Build()
 	}
 	//关闭连接
 	defer func(*http.Request) {
-		if r.Request != nil && r.Request.Body != nil && !r.chunk {
-			err := r.Request.Body.Close()
+		if req.Request != nil && req.Request.Body != nil && !req.chunk {
+			err := req.Request.Body.Close()
 			if err != nil {
 				fmt.Println("close request err", err)
 			}
 		}
-	}(r.Request)
+	}(req.Request)
 	// 关闭之后无法再次读取,[]byte len = 0
 	defer func(*http.Response) {
-		if r.Response != nil && r.Response.Body != nil && !r.chunk {
-			err := r.Response.Body.Close()
+		if req.Response != nil && req.Response.Body != nil && !req.chunk {
+			_, _ = io.Copy(ioutil.Discard, req.Response.Body)
+			err := req.Response.Body.Close()
 			if err != nil {
 				fmt.Println("关闭response连接 err", err)
 			}
 		}
-	}(r.Response)
+	}(req.Response)
 	count := 1
 	// do while ?
 	for {
-		res, err := r.client.Do(r.Request)
-		if err != nil && r.retry == 0 {
+		res, err := req.client.Do(req.Request)
+		if err != nil && req.retry == 0 {
 			fmt.Println("http call err = ", err)
-			return r
-		} else if err != nil && r.retry > 0 {
+			return req
+		} else if err != nil && req.retry > 0 {
 			fmt.Println("http call err retrying ...", count, "\n err = ", err)
-			r.retry--
+			req.retry--
 			count++
-			if r.retry == 0 {
-				return r
+			if req.retry == 0 {
+				return req
 			}
 		} else {
 			// ok
-			r.Response = res
-			if !r.chunk {
-				b, _ := ioutil.ReadAll(r.Response.Body)
-				r.result = string(b)
+			req.Response = res
+			if !req.chunk {
+				b, _ := ioutil.ReadAll(req.Response.Body)
+				req.result = string(b)
 			}
 			break
 		}
 	}
-	return r
+	return req
 }
 
 // Body 直接获取返回值
-func (r *Req) Body() (string, error) {
-	if r.Response == nil || r.result == "" {
+func (req *Req) Body() (string, error) {
+	if req.Response == nil || req.result == "" {
 		return "", errors.New("empty response")
 	}
-	return r.result, nil
+	return req.result, nil
 }
