@@ -14,10 +14,20 @@ import (
 
 // Test7 测试QuickSend0
 func Test7()  {
-	get := QuickSend0()
-	_, _ = get("http://localhost:8080/get/1")
-	any := QuickSend()
-	_, _ = any("http://localhost:8080/get/1",http.MethodGet,nil)
+	//get := QuickSend0()
+	//_, _ = get("http://localhost:8080/get/1")
+	req := &Req{}
+	_, _ = req.
+		Method(http.MethodPost).
+		Url("http://localhost:8080/post").
+		Header("Content-Type", "application/json").
+		Params(Query{
+			"id": "123",
+			"aaa" :"1123",
+		}).
+		Timeout(30).
+		Go(). //只有调用Go才会发起请求，并且在该方法内进行连接关闭防止泄露
+		Body()
 }
 
 // Test6 测试时间和内存

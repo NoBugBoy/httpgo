@@ -133,7 +133,7 @@ func parseParams(v interface{}) string {
 	}
 	return ""
 }
-func buildGetParam(params map[string]interface{}) string {
+func BuildGetParam(params map[string]interface{}) string {
 	buff := bytes.Buffer{}
 	buff.WriteString("?")
 	for k, v := range params {
@@ -181,7 +181,7 @@ func (req *Req) Build() *Req {
 	if req.method == http.MethodGet && req.pathQuery {
 		realpath = req.url.String()
 	} else if req.method == http.MethodGet && req.params != nil {
-		realpath = req.url.String() + buildGetParam(req.params)
+		realpath = req.url.String() + BuildGetParam(req.params)
 	} else {
 		realpath = req.url.String()
 		data = buildJson(req.params)
