@@ -262,13 +262,11 @@ func (req *Req) Go() *Req {
 }
 func reInit(req *Req)  {
 	req.isReady = false
-	req.header = nil
 	req.url = nil
 	req.params = nil
 	req.pathQuery = false
-	req.timeout = 5
 	req.chunk = false
-	req.proxy = nil
+	req.header = nil
 }
 
 // Body 直接获取返回值
