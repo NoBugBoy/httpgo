@@ -184,9 +184,17 @@ func (req *Req) Build() *Req {
 		realpath = req.url.String() + BuildGetParam(req.params)
 	} else {
 		realpath = req.url.String()
-		data = buildJson(req.params)
+		if req.params != nil{
+			data = buildJson(req.params)
+		}
 	}
-	httpRequest, err := http.NewRequest(req.method, realpath, bytes.NewReader(data))
+	var httpRequest *http.Request
+	var err error
+	if data == nil {
+		httpRequest, err = http.NewRequest(req.method, realpath, nil)
+	}else{
+		httpRequest, err = http.NewRequest(req.method, realpath, bytes.NewReader(data))
+	}
 	if err != nil {
 		panic(err)
 		return req
