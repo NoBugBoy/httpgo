@@ -13,7 +13,8 @@ func QuickSend() func(url string,method string,param Query) (string,error) {
 // QuickSend0 快速发送get请求
 func QuickSend0() func(url string) (string,error) {
 	r := &Req{}
+	r.Method(http.MethodGet)
 	return func(url string) (string,error){
-		return r.Url(url).Method(http.MethodGet).Build().Go().Body()
+		return r.Url(url).Build().Go().Body()
 	}
 }

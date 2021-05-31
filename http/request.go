@@ -187,7 +187,7 @@ func (req *Req) Build() *Req {
 	}
 	httpRequest, err := http.NewRequest(req.method, realpath, bytes.NewReader(data))
 	if err != nil {
-		fmt.Println("http new err = ", err)
+		panic(err)
 		return req
 	}
 	// add header
@@ -255,7 +255,17 @@ func (req *Req) Go() *Req {
 			break
 		}
 	}
+	reInit(req)
 	return req
+}
+func reInit(req *Req)  {
+	req.header = nil
+	req.url = nil
+	req.params = nil
+	req.pathQuery = false
+	req.timeout = 5
+	req.chunk = false
+	req.proxy = nil
 }
 
 // Body 直接获取返回值
