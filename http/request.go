@@ -116,9 +116,9 @@ func parseParams(v interface{}) string {
 	} else if k, ok := v.(int); ok {
 		return strconv.Itoa(k)
 	} else if k, ok := v.(float32); ok {
-		return fmt.Sprintf("%.2f", k)
+		return fmt.Sprintf("%.4f", k)
 	} else if k, ok := v.(float64); ok {
-		return fmt.Sprintf("%.2f", k)
+		return fmt.Sprintf("%.4f", k)
 	} else if k, ok := v.([]interface{}); ok {
 		for i := range k {
 			parseParams(i)
