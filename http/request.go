@@ -48,6 +48,7 @@ type Req struct {
 	Response   *http.Response         // 响应对象
 	result     string                 //最后的返回值，为了正常关闭io
 	params     map[string]interface{} //请求参数一律 key : value
+	isReady    bool //是否已经构建
 }
 
 // Header 设置请求头，多个调用多次即可
@@ -203,13 +204,14 @@ func (req *Req) Build() *Req {
 	}
 	req.client.Timeout = req.timeout
 	req.Request = httpRequest
+	req.isReady = true
 	return req
 }
 
 // Go 实际调用发送请求
 func (req *Req) Go() *Req {
 	// 未预构建，自动构建请求
-	if req.Request == nil {
+	if !req.isReady {
 		req.Build()
 	}
 	//关闭连接
@@ -259,6 +261,7 @@ func (req *Req) Go() *Req {
 	return req
 }
 func reInit(req *Req)  {
+	req.isReady = false
 	req.header = nil
 	req.url = nil
 	req.params = nil
