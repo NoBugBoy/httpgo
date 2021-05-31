@@ -18,11 +18,11 @@ func Test7()  {
 	//_, _ = get("http://localhost:8080/get/1")
 	req := &Req{}
 	_, _ = req.
-		Method(http.MethodPost).
+		Method(http.MethodGet).
 		Url("http://localhost:8080/post").
 		Header("Content-Type", "application/json").
 		Params(Query{
-			"id": "123",
+			"id": 1.2347866553232323,
 			"aaa" :"1123",
 		}).
 		Timeout(30).

@@ -116,9 +116,10 @@ func parseParams(v interface{}) string {
 	} else if k, ok := v.(int); ok {
 		return strconv.Itoa(k)
 	} else if k, ok := v.(float32); ok {
-		return fmt.Sprintf("%.4f", k)
+		return fmt.Sprintf("%g", k)
 	} else if k, ok := v.(float64); ok {
-		return fmt.Sprintf("%.4f", k)
+		//todo float64怎么能让精度超过16位呢 1.2347866553232323
+		return fmt.Sprintf("%g", k)
 	} else if k, ok := v.([]interface{}); ok {
 		for i := range k {
 			parseParams(i)
@@ -139,6 +140,7 @@ func BuildGetParam(params map[string]interface{}) string {
 	for k, v := range params {
 		buff.WriteString(k)
 		buff.WriteString("=")
+		fmt.Println(parseParams(v))
 		buff.WriteString(parseParams(v))
 		buff.WriteString("&")
 	}
