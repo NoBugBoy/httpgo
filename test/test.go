@@ -22,8 +22,8 @@ func Test7()  {
 		Url("http://localhost:8080/post").
 		Header("Content-Type", "application/json").
 		Params(Query{
-			"id": 1.2347866553232323,
-			"aaa" :"1123",
+			"id":   1.12312312312313122233333311133,
+			"aaa" : "1123",
 		}).
 		Timeout(30).
 		Go(). //只有调用Go才会发起请求，并且在该方法内进行连接关闭防止泄露

@@ -7,6 +7,7 @@ import (
 	json "github.com/json-iterator/go"
 	"io"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -120,6 +121,8 @@ func parseParams(v interface{}) string {
 	} else if k, ok := v.(float64); ok {
 		//todo float64怎么能让精度超过16位呢 1.2347866553232323
 		return fmt.Sprintf("%g", k)
+	}else if k, ok := v.(big.Float); ok {
+		return k.String()
 	} else if k, ok := v.([]interface{}); ok {
 		for i := range k {
 			parseParams(i)
