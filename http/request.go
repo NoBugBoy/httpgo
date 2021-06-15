@@ -143,7 +143,6 @@ func BuildGetParam(params map[string]interface{}) string {
 	for k, v := range params {
 		buff.WriteString(k)
 		buff.WriteString("=")
-		fmt.Println(parseParams(v))
 		buff.WriteString(parseParams(v))
 		buff.WriteString("&")
 	}
